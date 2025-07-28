@@ -79,6 +79,28 @@ class Gemini_CC_API_Registrar {
 					'permission_callback' => array( $this, 'check_permissions' ),
 				)
 			);
+			
+			// Frontend error logging endpoint
+			register_rest_route(
+				self::NAMESPACE,
+				'/debug/log-error',
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'log_frontend_error' ),
+					'permission_callback' => array( $this, 'check_permissions' ),
+					'args'                => array(
+						'type' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+						'log_entry' => array(
+							'required'          => true,
+							'type'              => 'object',
+						),
+					),
+				)
+			);
 		}
 
 		// Log if route registration failed
@@ -630,6 +652,64 @@ class Gemini_CC_API_Registrar {
 		);
 
 		return new WP_REST_Response( $debug_info, 200 );
+	}
+
+	/**
+	 * Log frontend error (only available when WP_DEBUG is true)
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response
+	 */
+	public function log_frontend_error( $request ) {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return new WP_REST_Response( 
+				array( 'error' => 'Debug mode not enabled' ), 
+				404 
+			);
+		}
+
+		$type = $request->get_param( 'type' );
+		$log_entry = $request->get_param( 'log_entry' );
+
+		// Enhanced frontend error logging
+		$enhanced_log_entry = array(
+			'source' => 'frontend',
+			'type' => $type,
+			'frontend_data' => $log_entry,
+			'server_context' => array(
+				'user_id' => get_current_user_id(),
+				'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+				'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+				'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+				'referer' => $_SERVER['HTTP_REFERER'] ?? 'unknown',
+				'server_time' => current_time( 'mysql' ),
+				'timestamp' => time(),
+			),
+			'wordpress_context' => array(
+				'wp_version' => get_bloginfo( 'version' ),
+				'plugin_version' => GEMINI_CC_VERSION,
+				'current_theme' => get_stylesheet(),
+				'active_plugins' => array_keys( get_plugins() ),
+				'is_multisite' => is_multisite(),
+				'memory_limit' => ini_get( 'memory_limit' ),
+				'max_execution_time' => ini_get( 'max_execution_time' ),
+			)
+		);
+
+		// Log the enhanced error
+		$this->log_error( 'Frontend Error: ' . ($log_entry['message'] ?? 'Unknown error'), $enhanced_log_entry );
+		
+		// Also log to API call log for tracking
+		$this->log_api_call( 'frontend_error_log', $request );
+
+		return new WP_REST_Response( 
+			array( 
+				'success' => true,
+				'message' => 'Frontend error logged successfully',
+				'log_id' => $enhanced_log_entry['server_context']['timestamp']
+			), 
+			200 
+		);
 	}
 
 	/**
@@ -1205,14 +1285,55 @@ class Gemini_CC_API_Registrar {
 	 */
 	private function get_settings_schema() {
 		return array(
+			// Gemini API Configuration
+			'gemini_api_key'               => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'description'       => 'Your Gemini API key from Google AI Studio',
+			),
+			'gemini_model'                 => array(
+				'type'    => 'string',
+				'enum'    => array( 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash' ),
+				'default' => 'gemini-2.0-flash',
+			),
+			'gemini_temperature'           => array(
+				'type'    => 'number',
+				'minimum' => 0.0,
+				'maximum' => 2.0,
+				'default' => 0.7,
+			),
+			'gemini_max_tokens'            => array(
+				'type'    => 'integer',
+				'minimum' => 1,
+				'maximum' => 8192,
+				'default' => 1000,
+			),
+			// Legacy support (to be removed)
 			'api_key'                      => array(
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 			),
+			// Enhanced Debugging Settings
+			'enable_verbose_logging'       => array(
+				'type'    => 'boolean',
+				'default' => false,
+			),
+			'system_logging_enabled'       => array(
+				'type'    => 'boolean',
+				'default' => true,
+			),
+			'log_retention_days'           => array(
+				'type'    => 'integer',
+				'minimum' => 1,
+				'maximum' => 30,
+				'default' => 7,
+			),
+			// Operation Settings
 			'operation_mode'               => array(
 				'type' => 'string',
 				'enum' => array( 'approval', 'autonomous' ),
 			),
+			// SEO Settings
 			'seo_internal_links_enabled'   => array(
 				'type' => 'boolean',
 			),
@@ -1233,9 +1354,11 @@ class Gemini_CC_API_Registrar {
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 			),
+			// UI/UX Settings
 			'uiux_enabled'                 => array(
 				'type' => 'boolean',
 			),
+			// Content Settings
 			'content_default_status'       => array(
 				'type' => 'string',
 				'enum' => array( 'draft', 'publish' ),
@@ -1334,17 +1457,142 @@ class Gemini_CC_API_Registrar {
 	 * @return array
 	 */
 	private function test_api_connection( $api_key ) {
-		// Implementation placeholder - would test actual Gemini API
+		// Validate API key format
 		if ( empty( $api_key ) || strlen( $api_key ) < 10 ) {
+			$this->log_error( 'Invalid API key format provided', array( 
+				'key_length' => strlen( $api_key ),
+				'function' => __FUNCTION__
+			) );
 			return array(
 				'success' => false,
-				'message' => __( 'Invalid API key format.', 'gemini-command-center' ),
+				'message' => __( 'Invalid API key format. API key should be at least 10 characters long.', 'gemini-command-center' ),
 			);
 		}
 
+		// Get model from settings for testing
+		$settings = get_option( 'gemini_cc_settings', array() );
+		$model = $settings['gemini_model'] ?? 'gemini-2.0-flash';
+
+		// Test actual Gemini API connection
+		$url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
+		
+		$test_payload = array(
+			'contents' => array(
+				array(
+					'parts' => array(
+						array(
+							'text' => 'Hello! This is a connection test. Please respond with "Connection successful" and nothing else.'
+						)
+					)
+				)
+			),
+			'generationConfig' => array(
+				'maxOutputTokens' => 50,
+				'temperature' => 0.1
+			)
+		);
+
+		$this->log_info( 'Testing Gemini API connection', array(
+			'model' => $model,
+			'url' => $url,
+			'key_length' => strlen( $api_key )
+		) );
+
+		$response = wp_remote_post( $url, array(
+			'headers' => array(
+				'Content-Type' => 'application/json',
+				'X-goog-api-key' => $api_key,
+			),
+			'body' => wp_json_encode( $test_payload ),
+			'timeout' => 30,
+			'sslverify' => true,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			$this->log_error( 'Gemini API connection test failed', array(
+				'error' => $response->get_error_message(),
+				'url' => $url,
+				'model' => $model,
+				'function' => __FUNCTION__
+			) );
+			return array(
+				'success' => false,
+				'message' => sprintf( __( 'Connection failed: %s. Please check your internet connection.', 'gemini-command-center' ), $response->get_error_message() ),
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		
+		if ( $status_code !== 200 ) {
+			$error_data = json_decode( $body, true );
+			$error_message = $error_data['error']['message'] ?? 'Unknown error occurred';
+			
+			$this->log_error( 'Gemini API returned error status', array(
+				'status_code' => $status_code,
+				'error_message' => $error_message,
+				'response_body' => $body,
+				'model' => $model,
+				'function' => __FUNCTION__
+			) );
+			
+			// Provide helpful error messages based on status code
+			$user_message = '';
+			switch ( $status_code ) {
+				case 400:
+					$user_message = sprintf( __( 'Bad Request (400): %s. Please check your API configuration.', 'gemini-command-center' ), $error_message );
+					break;
+				case 401:
+					$user_message = __( 'Authentication failed (401): Invalid API key. Please check your Gemini API key.', 'gemini-command-center' );
+					break;
+				case 403:
+					$user_message = sprintf( __( 'Access forbidden (403): %s. Your API key may not have permission to use this model.', 'gemini-command-center' ), $error_message );
+					break;
+				case 404:
+					$user_message = sprintf( __( 'Model not found (404): The model "%s" may not be available.', 'gemini-command-center' ), $model );
+					break;
+				case 429:
+					$user_message = __( 'Rate limit exceeded (429): Too many requests. Please wait and try again.', 'gemini-command-center' );
+					break;
+				default:
+					$user_message = sprintf( __( 'API Error (%d): %s', 'gemini-command-center' ), $status_code, $error_message );
+			}
+			
+			return array(
+				'success' => false,
+				'message' => $user_message,
+			);
+		}
+
+		$data = json_decode( $body, true );
+		
+		if ( ! isset( $data['candidates'][0]['content']['parts'][0]['text'] ) ) {
+			$this->log_error( 'Unexpected Gemini API response format', array(
+				'response_body' => $body,
+				'parsed_data' => $data,
+				'model' => $model,
+				'function' => __FUNCTION__
+			) );
+			return array(
+				'success' => false,
+				'message' => __( 'Unexpected API response format. The API may have changed.', 'gemini-command-center' ),
+			);
+		}
+
+		$response_text = $data['candidates'][0]['content']['parts'][0]['text'];
+		
+		$this->log_info( 'Gemini API connection test successful', array(
+			'model' => $model,
+			'response' => $response_text,
+			'usage' => $data['usageMetadata'] ?? null
+		) );
+		
 		return array(
 			'success' => true,
-			'message' => __( 'API connection test successful.', 'gemini-command-center' ),
+			'message' => sprintf( __( 'API connection test successful! Model: %s', 'gemini-command-center' ), $model ),
+			'response' => $response_text,
+			'model' => $model,
+			'usage' => $data['usageMetadata'] ?? null,
 		);
 	}
 
@@ -1356,17 +1604,174 @@ class Gemini_CC_API_Registrar {
 	 * @return array
 	 */
 	private function process_agent_conversation( $message, $history ) {
-		// Implementation placeholder - would integrate with Gemini API
-		$responses = array(
-			'Hello! I\'m your Gemini AI assistant. How can I help you manage your WordPress site today?',
-			'I can help you with SEO optimization, content creation, backups, and system monitoring.',
-			'What specific task would you like me to help you with?',
-			'I\'m here to assist with your WordPress management needs.',
+		// Get API key from settings (check both new and legacy keys)
+		$settings = get_option( 'gemini_cc_settings', array() );
+		$api_key = $settings['gemini_api_key'] ?? $settings['api_key'] ?? '';
+		
+		if ( empty( $api_key ) ) {
+			$this->log_error( 'No API key configured for agent conversation', array(
+				'function' => __FUNCTION__,
+				'message_length' => strlen( $message ),
+				'settings_keys' => array_keys( $settings )
+			) );
+			return array(
+				'message' => __( 'Error: Gemini API key not configured. Please set your Gemini API key in Settings → API Configuration.', 'gemini-command-center' ),
+				'timestamp' => time(),
+				'error' => true,
+			);
+		}
+
+		// Get model configuration from settings
+		$model = $settings['gemini_model'] ?? 'gemini-2.0-flash';
+		$temperature = $settings['gemini_temperature'] ?? 0.7;
+		$max_tokens = $settings['gemini_max_tokens'] ?? 1000;
+
+		// Build conversation context
+		$contents = array();
+		
+		// Add conversation history (last 10 exchanges to maintain context)
+		if ( ! empty( $history ) && is_array( $history ) ) {
+			$recent_history = array_slice( $history, -10 );
+			foreach ( $recent_history as $exchange ) {
+				if ( isset( $exchange['type'] ) && isset( $exchange['message'] ) ) {
+					$role = $exchange['type'] === 'user' ? 'user' : 'model';
+					$contents[] = array(
+						'role' => $role,
+						'parts' => array(
+							array( 'text' => $exchange['message'] )
+						)
+					);
+				}
+			}
+		}
+		
+		// Add current user message
+		$contents[] = array(
+			'role' => 'user',
+			'parts' => array(
+				array( 'text' => $message )
+			)
 		);
 
+		$url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
+		
+		$payload = array(
+			'contents' => $contents,
+			'generationConfig' => array(
+				'maxOutputTokens' => intval( $max_tokens ),
+				'temperature' => floatval( $temperature ),
+				'topP' => 0.8,
+				'topK' => 40,
+			),
+			'systemInstruction' => array(
+				'parts' => array(
+					array(
+						'text' => 'You are a helpful WordPress management assistant for the Gemini Command Center plugin. Provide practical advice about WordPress administration, SEO, content management, security, and troubleshooting. Keep responses concise and actionable. When discussing technical issues, provide step-by-step solutions.'
+					)
+				)
+			)
+		);
+
+		$this->log_info( 'Sending request to Gemini API', array(
+			'model' => $model,
+			'temperature' => $temperature,
+			'max_tokens' => $max_tokens,
+			'message_length' => strlen( $message ),
+			'history_length' => count( $history ?? array() )
+		) );
+
+		$response = wp_remote_post( $url, array(
+			'headers' => array(
+				'Content-Type' => 'application/json',
+				'X-goog-api-key' => $api_key,
+			),
+			'body' => wp_json_encode( $payload ),
+			'timeout' => 60,
+			'sslverify' => true,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			$this->log_error( 'Gemini API conversation request failed', array(
+				'error' => $response->get_error_message(),
+				'url' => $url,
+				'model' => $model,
+				'message_length' => strlen( $message ),
+				'function' => __FUNCTION__
+			) );
+			return array(
+				'message' => sprintf( __( 'Connection Error: %s. Please check your internet connection and API key.', 'gemini-command-center' ), $response->get_error_message() ),
+				'timestamp' => time(),
+				'error' => true,
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		
+		if ( $status_code !== 200 ) {
+			$error_data = json_decode( $body, true );
+			$error_message = $error_data['error']['message'] ?? 'Unknown API error occurred';
+			
+			$this->log_error( 'Gemini API conversation returned error', array(
+				'status_code' => $status_code,
+				'error_message' => $error_message,
+				'response_body' => $body,
+				'model' => $model,
+				'function' => __FUNCTION__
+			) );
+			
+			// Provide helpful error messages based on status code
+			$user_message = '';
+			switch ( $status_code ) {
+				case 401:
+					$user_message = __( 'API Authentication Error: Please check your Gemini API key in Settings.', 'gemini-command-center' );
+					break;
+				case 403:
+					$user_message = __( 'API Access Denied: Your API key may not have permission to use this model.', 'gemini-command-center' );
+					break;
+				case 429:
+					$user_message = __( 'API Rate Limit: Too many requests. Please wait a moment and try again.', 'gemini-command-center' );
+					break;
+				default:
+					$user_message = sprintf( __( 'API Error (%d): %s', 'gemini-command-center' ), $status_code, $error_message );
+			}
+			
+			return array(
+				'message' => $user_message,
+				'timestamp' => time(),
+				'error' => true,
+			);
+		}
+
+		$data = json_decode( $body, true );
+		
+		if ( ! isset( $data['candidates'][0]['content']['parts'][0]['text'] ) ) {
+			$this->log_error( 'Unexpected Gemini API conversation response format', array(
+				'response_body' => $body,
+				'parsed_data' => $data,
+				'model' => $model,
+				'function' => __FUNCTION__
+			) );
+			return array(
+				'message' => __( 'Error: Unexpected API response format. Please try again.', 'gemini-command-center' ),
+				'timestamp' => time(),
+				'error' => true,
+			);
+		}
+
+		$ai_response = $data['candidates'][0]['content']['parts'][0]['text'];
+		
+		$this->log_info( 'Gemini API conversation successful', array(
+			'model' => $model,
+			'response_length' => strlen( $ai_response ),
+			'usage' => $data['usageMetadata'] ?? null
+		) );
+		
 		return array(
-			'message' => $responses[ array_rand( $responses ) ],
+			'message' => $ai_response,
 			'timestamp' => time(),
+			'usage' => $data['usageMetadata'] ?? null,
+			'model' => $model,
 		);
 	}
 
@@ -1435,6 +1840,96 @@ class Gemini_CC_API_Registrar {
 		// Also log to PHP error log if WP_DEBUG is enabled
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			error_log( 'Gemini CC API Error: ' . $message . ' | Context: ' . wp_json_encode( $context ) );
+		}
+	}
+
+	/**
+	 * Enhanced error logging for Gemini API operations
+	 *
+	 * @param string $message Error message.
+	 * @param array  $context Error context.
+	 */
+	private function log_error( $message, $context = array() ) {
+		$settings = get_option( 'gemini_cc_settings', array() );
+		
+		// Enhanced error logging with more context
+		$log_entry = array(
+			'type'      => 'gemini_error',
+			'level'     => 'error',
+			'message'   => $message,
+			'context'   => $context,
+			'user_id'   => get_current_user_id(),
+			'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+			'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+			'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+			'time'      => current_time( 'mysql' ),
+			'timestamp' => time(),
+			'backtrace' => wp_debug_backtrace_summary(),
+			'memory_usage' => memory_get_usage( true ),
+			'memory_peak' => memory_get_peak_usage( true ),
+		);
+
+		$error_log = get_option( 'gemini_cc_error_log', array() );
+		$error_log[] = $log_entry;
+
+		// Keep only last 1000 error entries for enhanced debugging
+		if ( count( $error_log ) > 1000 ) {
+			$error_log = array_slice( $error_log, -1000 );
+		}
+
+		update_option( 'gemini_cc_error_log', $error_log );
+
+		// Enhanced PHP error logging
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$error_details = array(
+				'message' => $message,
+				'context' => $context,
+				'memory' => round( memory_get_usage( true ) / 1024 / 1024, 2 ) . 'MB',
+				'time' => current_time( 'c' )
+			);
+			error_log( '[Gemini CC ERROR]: ' . wp_json_encode( $error_details ) );
+		}
+
+		// Also trigger WordPress error hooks for monitoring plugins
+		do_action( 'gemini_cc_error_logged', $message, $context, $log_entry );
+	}
+
+	/**
+	 * Enhanced info logging for debugging
+	 *
+	 * @param string $message Info message.
+	 * @param array  $context Info context.
+	 */
+	private function log_info( $message, $context = array() ) {
+		$settings = get_option( 'gemini_cc_settings', array() );
+		
+		// Only log info if verbose logging is enabled
+		if ( empty( $settings['enable_verbose_logging'] ) ) {
+			return;
+		}
+		
+		$log_entry = array(
+			'type'      => 'info',
+			'level'     => 'info',
+			'message'   => $message,
+			'context'   => $context,
+			'user_id'   => get_current_user_id(),
+			'time'      => current_time( 'mysql' ),
+			'timestamp' => time(),
+		);
+
+		$api_log = get_option( 'gemini_cc_api_log', array() );
+		$api_log[] = $log_entry;
+
+		// Keep only last 2000 entries for info logs
+		if ( count( $api_log ) > 2000 ) {
+			$api_log = array_slice( $api_log, -2000 );
+		}
+
+		update_option( 'gemini_cc_api_log', $api_log );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( '[Gemini CC INFO]: ' . $message . ' | Context: ' . wp_json_encode( $context ) );
 		}
 	}
 }

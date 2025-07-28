@@ -242,11 +242,19 @@ class Gemini_CC_Assets_Loader {
 		(function() {
 			'use strict';
 
-			// Enhanced logging system
+			// Enhanced logging system with API integration monitoring
 			const GeminiLogger = {
 				logs: [],
+				apiCalls: [],
+				errorPatterns: {
+					gemini_api: /generativelanguage\.googleapis\.com/,
+					wordpress_api: /wp-json/,
+					nonce_error: /nonce|forbidden|403/i,
+					network_error: /network|timeout|connection/i
+				},
 				log: function(level, message, data = null) {
 					const logEntry = {
+						id: this.generateId(),
 						timestamp: new Date().toISOString(),
 						level: level,
 						message: message,
@@ -254,39 +262,183 @@ class Gemini_CC_Assets_Loader {
 						url: window.location.href,
 						userAgent: navigator.userAgent,
 						wp_version: window.gemini_cc_data?.wp_version || 'unknown',
-						plugin_version: window.gemini_cc_data?.plugin_version || 'unknown'
+						plugin_version: window.gemini_cc_data?.plugin_version || 'unknown',
+						stack: level === 'error' ? (new Error()).stack : null,
+						performance: {
+							memory: performance.memory ? {
+								used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024 * 100) / 100,
+								total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024 * 100) / 100,
+								limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024 * 100) / 100
+							} : null,
+							timing: performance.timing ? {
+								load: performance.timing.loadEventEnd - performance.timing.navigationStart,
+								dom: performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart
+							} : null
+						}
 					};
 
 					this.logs.push(logEntry);
 					
+					// Enhanced console output with categorization
 					const colors = {
-						error: 'color: #ff4444; font-weight: bold',
-						warn: 'color: #ffaa00; font-weight: bold',
-						info: 'color: #4444ff',
-						debug: 'color: #888888'
+						error: 'color: #ff4444; font-weight: bold; background: #ffe6e6; padding: 2px 6px',
+						warn: 'color: #ffaa00; font-weight: bold; background: #fff8e6; padding: 2px 6px',
+						info: 'color: #4444ff; background: #e6f3ff; padding: 2px 6px',
+						debug: 'color: #888888; background: #f5f5f5; padding: 2px 6px',
+						api: 'color: #9966cc; font-weight: bold; background: #f3e6ff; padding: 2px 6px'
 					};
 					
-					console.log(`%c[Gemini CC \${level.toUpperCase()}] \${message}`, colors[level] || '', data || '');
+					const timestamp = new Date().toLocaleTimeString();
+					console.log(
+						`%c[Gemini CC \${level.toUpperCase()}] \${timestamp} \${message}`, 
+						colors[level] || colors.debug, 
+						data || ''
+					);
 					
-					// Store in localStorage for debugging
+					// Auto-detect error patterns and enhance logging
+					this.detectErrorPatterns(message, data, level);
+					
+					// Store in localStorage with enhanced data
+					this.persistLog(logEntry);
+					
+					// Send critical errors to WordPress backend
+					if (level === 'error' && window.gemini_cc_data?.api_url) {
+						this.reportCriticalError(logEntry);
+					}
+				},
+				
+				generateId: function() {
+					return Date.now().toString(36) + Math.random().toString(36).substr(2);
+				},
+				
+				detectErrorPatterns: function(message, data, level) {
+					const fullContext = \`\${message} \${JSON.stringify(data || {})}\`;
+					
+					Object.keys(this.errorPatterns).forEach(pattern => {
+						if (this.errorPatterns[pattern].test(fullContext)) {
+							this.log('warn', \`Detected \${pattern} issue pattern\`, {
+								original_message: message,
+								original_data: data,
+								detected_pattern: pattern
+							});
+						}
+					});
+				},
+				
+				persistLog: function(logEntry) {
 					try {
 						const storedLogs = JSON.parse(localStorage.getItem('gemini_cc_debug_logs') || '[]');
 						storedLogs.push(logEntry);
-						if (storedLogs.length > 100) {
-							storedLogs.splice(0, storedLogs.length - 100);
+						
+						// Keep only last 200 entries with size management
+						if (storedLogs.length > 200) {
+							storedLogs.splice(0, storedLogs.length - 200);
 						}
+						
+						// Check storage size and clean if needed
+						const logSize = JSON.stringify(storedLogs).length;
+						if (logSize > 1024 * 1024) { // 1MB limit
+							storedLogs.splice(0, Math.floor(storedLogs.length / 2));
+						}
+						
 						localStorage.setItem('gemini_cc_debug_logs', JSON.stringify(storedLogs));
+						localStorage.setItem('gemini_cc_last_log_time', Date.now());
 					} catch (e) {
 						console.error('Failed to store debug log:', e);
+						// Clear logs if storage is full
+						try {
+							localStorage.removeItem('gemini_cc_debug_logs');
+							this.warn('Cleared debug logs due to storage limit', { error: e.message });
+						} catch (e2) {
+							console.error('Failed to clear debug logs:', e2);
+						}
 					}
 				},
+				
+				reportCriticalError: function(logEntry) {
+					// Debounce critical error reporting
+					if (this.lastCriticalReport && Date.now() - this.lastCriticalReport < 5000) {
+						return;
+					}
+					this.lastCriticalReport = Date.now();
+					
+					setTimeout(() => {
+						if (window.wp?.apiFetch) {
+							wp.apiFetch({
+								path: 'debug/log-error',
+								method: 'POST',
+								data: {
+									type: 'frontend_critical_error',
+									log_entry: logEntry,
+									timestamp: Date.now()
+								}
+							}).catch(error => {
+								console.warn('Failed to report critical error to backend:', error);
+							});
+						}
+					}, 100);
+				},
+				
+				logApiCall: function(method, url, options, response = null, error = null) {
+					const apiCall = {
+						id: this.generateId(),
+						timestamp: new Date().toISOString(),
+						method: method,
+						url: url,
+						options: this.sanitizeApiOptions(options),
+						response: response ? {
+							status: response.status,
+							ok: response.ok,
+							headers: response.headers ? Object.fromEntries(response.headers.entries()) : null
+						} : null,
+						error: error ? {
+							message: error.message,
+							name: error.name,
+							stack: error.stack
+						} : null,
+						duration: null
+					};
+					
+					this.apiCalls.push(apiCall);
+					
+					// Keep only last 50 API calls
+					if (this.apiCalls.length > 50) {
+						this.apiCalls.splice(0, this.apiCalls.length - 50);
+					}
+					
+					this.log('api', \`API Call: \${method} \${url}\`, {
+						status: response?.status || 'pending',
+						error: error?.message || null
+					});
+					
+					return apiCall.id;
+				},
+				
+				sanitizeApiOptions: function(options) {
+					if (!options) return null;
+					
+					const sanitized = { ...options };
+					
+					// Remove sensitive data
+					if (sanitized.headers && sanitized.headers['X-WP-Nonce']) {
+						sanitized.headers['X-WP-Nonce'] = '[REDACTED]';
+					}
+					if (sanitized.headers && sanitized.headers['Authorization']) {
+						sanitized.headers['Authorization'] = '[REDACTED]';
+					}
+					
+					return sanitized;
+				},
+				
 				error: function(message, data) { this.log('error', message, data); },
 				warn: function(message, data) { this.log('warn', message, data); },
 				info: function(message, data) { this.log('info', message, data); },
 				debug: function(message, data) { this.log('debug', message, data); },
+				
 				exportLogs: function() {
 					return {
 						current_session: this.logs,
+						api_calls: this.apiCalls,
 						stored_logs: JSON.parse(localStorage.getItem('gemini_cc_debug_logs') || '[]'),
 						system_info: {
 							url: window.location.href,
@@ -566,7 +718,6 @@ class Gemini_CC_Assets_Loader {
 
 		})();
 		";
-	}
 	}
 
 	/**
