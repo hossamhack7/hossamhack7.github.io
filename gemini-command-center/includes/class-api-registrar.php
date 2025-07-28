@@ -1050,13 +1050,34 @@ class Gemini_CC_API_Registrar {
 	public function get_system_log( $request ) {
 		$this->log_api_call( 'get_log', $request );
 
-		// Implementation placeholder
-		return new WP_REST_Response(
-			array(
-				'log_entries' => array(),
+		$api_log = get_option( 'gemini_cc_api_log', array() );
+		$error_log = get_option( 'gemini_cc_error_log', array() );
+		
+		// Get recent entries (last 50 of each type)
+		$recent_api = array_slice( $api_log, -50 );
+		$recent_errors = array_slice( $error_log, -50 );
+
+		$log_data = array(
+			'api_calls' => $recent_api,
+			'errors' => $recent_errors,
+			'summary' => array(
+				'total_api_calls' => count( $api_log ),
+				'total_errors' => count( $error_log ),
+				'recent_errors_count' => count( array_filter( $recent_errors, function( $entry ) {
+					return isset( $entry['timestamp'] ) && $entry['timestamp'] > ( time() - 3600 ); // Last hour
+				} ) ),
 			),
-			200
+			'system_info' => array(
+				'wp_version' => get_bloginfo( 'version' ),
+				'php_version' => PHP_VERSION,
+				'plugin_version' => GEMINI_CC_VERSION,
+				'memory_limit' => ini_get( 'memory_limit' ),
+				'max_execution_time' => ini_get( 'max_execution_time' ),
+				'wp_debug' => defined( 'WP_DEBUG' ) && WP_DEBUG,
+			),
 		);
+
+		return new WP_REST_Response( $log_data, 200 );
 	}
 
 	/**
@@ -1068,11 +1089,14 @@ class Gemini_CC_API_Registrar {
 	public function clear_system_log( $request ) {
 		$this->log_api_call( 'clear_log', $request );
 
-		// Implementation placeholder
+		// Clear both API and error logs
+		delete_option( 'gemini_cc_api_log' );
+		delete_option( 'gemini_cc_error_log' );
+
 		return new WP_REST_Response(
 			array(
 				'success' => true,
-				'message' => __( 'System log cleared successfully.', 'gemini-command-center' ),
+				'message' => __( 'System logs cleared successfully.', 'gemini-command-center' ),
 			),
 			200
 		);

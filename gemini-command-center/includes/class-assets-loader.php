@@ -64,6 +64,7 @@ class Gemini_CC_Assets_Loader {
 		$plugin_pages = array(
 			'toplevel_page_gemini-command-center',
 			'gemini-command-center_page_gemini-agent',
+			'gemini-command-center_page_gemini-debug',
 		);
 
 		return in_array( $hook_suffix, $plugin_pages, true );
