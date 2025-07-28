@@ -1,0 +1,403 @@
+/* Universal CSS for Gemini Command Center Extension */
+
+/* Ensure our extension elements don't inherit site styles */
+#gemini-cc-widget,
+#gemini-cc-widget *,
+.gemini-cc-modal,
+.gemini-cc-modal * {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  box-sizing: border-box !important;
+}
+
+/* Main widget styles */
+#gemini-cc-widget {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 350px !important;
+  height: 500px !important;
+  background: white !important;
+  border: 2px solid #0073aa !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  z-index: 2147483647 !important; /* Maximum z-index */
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  overflow: hidden !important;
+  resize: both !important;
+  min-width: 300px !important;
+  min-height: 400px !important;
+}
+
+/* Widget header */
+#gemini-cc-widget .widget-header {
+  background: linear-gradient(135deg, #0073aa, #005a87) !important;
+  color: white !important;
+  padding: 15px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: move !important;
+}
+
+#gemini-cc-widget .widget-title {
+  margin: 0 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+#gemini-cc-widget .widget-close {
+  background: none !important;
+  border: none !important;
+  color: white !important;
+  cursor: pointer !important;
+  font-size: 20px !important;
+  padding: 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 3px !important;
+  transition: background 0.2s !important;
+}
+
+#gemini-cc-widget .widget-close:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Widget content */
+#gemini-cc-widget .widget-content {
+  padding: 20px !important;
+  height: calc(100% - 50px) !important;
+  overflow-y: auto !important;
+  color: #333 !important;
+}
+
+/* Analysis summary */
+.analysis-summary {
+  background: #f8f9fa !important;
+  border-radius: 6px !important;
+  padding: 15px !important;
+  margin-bottom: 20px !important;
+  border-left: 4px solid #0073aa !important;
+}
+
+.analysis-summary h4 {
+  margin: 0 0 10px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.analysis-item {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 4px 0 !important;
+  font-size: 13px !important;
+}
+
+.analysis-label {
+  font-weight: 500 !important;
+  color: #555 !important;
+}
+
+.analysis-value {
+  color: #0073aa !important;
+  font-weight: 600 !important;
+}
+
+/* Quick actions */
+.quick-actions h4 {
+  margin: 0 0 15px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.action-btn {
+  display: block !important;
+  width: 100% !important;
+  padding: 12px 16px !important;
+  margin: 8px 0 !important;
+  background: #0073aa !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  transition: all 0.2s !important;
+  text-decoration: none !important;
+}
+
+.action-btn:hover {
+  background: #005a87 !important;
+  transform: translateY(-1px) !important;
+}
+
+.action-btn:active {
+  transform: translateY(0) !important;
+}
+
+.action-btn.secondary {
+  background: #666 !important;
+}
+
+.action-btn.secondary:hover {
+  background: #555 !important;
+}
+
+/* Debug info */
+.debug-info {
+  background: #f9f9f9 !important;
+  border-radius: 6px !important;
+  padding: 15px !important;
+  margin-top: 20px !important;
+}
+
+.debug-info h4 {
+  margin: 0 0 10px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+.debug-content {
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  padding: 10px !important;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  color: #333 !important;
+  max-height: 150px !important;
+  overflow-y: auto !important;
+}
+
+.debug-line {
+  margin: 2px 0 !important;
+}
+
+/* Modal styles */
+.gemini-cc-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+}
+
+.gemini-cc-modal-content {
+  background: white !important;
+  border-radius: 8px !important;
+  max-width: 80% !important;
+  max-height: 80% !important;
+  overflow: auto !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+}
+
+.gemini-cc-modal-header {
+  background: #0073aa !important;
+  color: white !important;
+  padding: 20px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.gemini-cc-modal-title {
+  margin: 0 !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+.gemini-cc-modal-close {
+  background: none !important;
+  border: none !important;
+  color: white !important;
+  cursor: pointer !important;
+  font-size: 24px !important;
+  padding: 0 !important;
+}
+
+.gemini-cc-modal-body {
+  padding: 20px !important;
+  color: #333 !important;
+}
+
+/* SEO Report styles */
+.seo-score-circle {
+  display: inline-block !important;
+  width: 100px !important;
+  height: 100px !important;
+  border-radius: 50% !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 24px !important;
+  font-weight: bold !important;
+  margin: 0 auto 20px auto !important;
+}
+
+.seo-score-excellent {
+  background: #44aa44 !important;
+}
+
+.seo-score-good {
+  background: #ffaa00 !important;
+}
+
+.seo-score-poor {
+  background: #ff4444 !important;
+}
+
+.seo-issues {
+  background: #fff5f5 !important;
+  border-left: 4px solid #ff4444 !important;
+  padding: 15px !important;
+  margin: 15px 0 !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+
+.seo-recommendations {
+  background: #f0f8ff !important;
+  border-left: 4px solid #0073aa !important;
+  padding: 15px !important;
+  margin: 15px 0 !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+
+.seo-issues h5,
+.seo-recommendations h5 {
+  margin: 0 0 10px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.seo-issues ul,
+.seo-recommendations ul {
+  margin: 0 !important;
+  padding-left: 20px !important;
+}
+
+.seo-issues li {
+  color: #cc0000 !important;
+  margin: 5px 0 !important;
+}
+
+.seo-recommendations li {
+  color: #0066cc !important;
+  margin: 5px 0 !important;
+}
+
+/* Notification styles */
+.gemini-notification {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 6px !important;
+  padding: 15px 20px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  z-index: 2147483647 !important;
+  max-width: 350px !important;
+  font-size: 14px !important;
+  color: #333 !important;
+  animation: gemini-slide-in 0.3s ease-out !important;
+}
+
+.gemini-notification.success {
+  border-left: 4px solid #44aa44 !important;
+}
+
+.gemini-notification.error {
+  border-left: 4px solid #ff4444 !important;
+}
+
+.gemini-notification.warning {
+  border-left: 4px solid #ffaa00 !important;
+}
+
+.gemini-notification.info {
+  border-left: 4px solid #0073aa !important;
+}
+
+@keyframes gemini-slide-in {
+  from {
+    transform: translateX(100%) !important;
+    opacity: 0 !important;
+  }
+  to {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #gemini-cc-widget {
+    width: calc(100% - 40px) !important;
+    height: calc(100% - 40px) !important;
+    top: 20px !important;
+    left: 20px !important;
+    right: 20px !important;
+  }
+  
+  .gemini-cc-modal {
+    padding: 10px !important;
+  }
+  
+  .gemini-cc-modal-content {
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+}
+
+/* Accessibility improvements */
+.action-btn:focus,
+.widget-close:focus {
+  outline: 2px solid #0073aa !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  #gemini-cc-widget {
+    border-width: 3px !important;
+  }
+  
+  .action-btn {
+    border: 2px solid transparent !important;
+  }
+  
+  .action-btn:focus {
+    border-color: currentColor !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .action-btn,
+  .widget-close,
+  .gemini-notification {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .action-btn:hover {
+    transform: none !important;
+  }
+}
