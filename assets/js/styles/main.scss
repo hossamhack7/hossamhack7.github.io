@@ -1,0 +1,148 @@
+// Main styles for Gemini Command Center
+@import './variables';
+@import './components';
+@import './dashboard';
+@import './settings';
+@import './agent';
+@import './system';
+
+// Global styles
+.gcc-app {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+
+.gcc-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    
+    h3 {
+        margin: 0 0 15px 0;
+        color: #1d2327;
+        font-size: 18px;
+        font-weight: 600;
+    }
+    
+    h4 {
+        margin: 0 0 10px 0;
+        color: #1d2327;
+        font-size: 16px;
+        font-weight: 600;
+    }
+}
+
+.gcc-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    
+    .gcc-spinner {
+        display: inline-block;
+        width: 32px;
+        height: 32px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+    }
+    
+    p {
+        color: #666;
+        margin: 0;
+        font-size: 16px;
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.gcc-error {
+    text-align: center;
+    padding: 40px 20px;
+    
+    h2 {
+        color: #dc3545;
+        margin-bottom: 10px;
+    }
+    
+    p {
+        color: #666;
+        margin-bottom: 20px;
+    }
+}
+
+.gcc-notice {
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin: 10px 0;
+    
+    &.success {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+    
+    &.error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    &.warning {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+    }
+}
+
+.gcc-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e5e5;
+    }
+    
+    th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    tr:hover {
+        background-color: #f8f9fa;
+    }
+}
+
+.status-good {
+    color: #28a745;
+}
+
+.status-warning {
+    color: #fd7e14;
+}
+
+.status-error {
+    color: #dc3545;
+}
+
+.status-configured {
+    color: #28a745;
+}
+
+.status-not_configured {
+    color: #fd7e14;
+}

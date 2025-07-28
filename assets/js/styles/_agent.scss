@@ -1,0 +1,239 @@
+// AI Agent Chat styles
+.gcc-agent-chat {
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+    border: 1px solid $border-color;
+    border-radius: $border-radius;
+    background: white;
+    
+    .gcc-chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid $border-color;
+        background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+        color: white;
+        border-radius: $border-radius $border-radius 0 0;
+        
+        .gcc-agent-info {
+            display: flex;
+            align-items: center;
+            
+            .gcc-agent-avatar {
+                width: 40px;
+                height: 40px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 15px;
+                
+                .dashicons {
+                    font-size: 20px;
+                }
+            }
+            
+            .gcc-agent-details {
+                h3 {
+                    margin: 0 0 2px 0;
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: white;
+                }
+                
+                .gcc-status {
+                    font-size: 12px;
+                    opacity: 0.9;
+                    
+                    &.online {
+                        color: #90ee90;
+                    }
+                }
+            }
+        }
+        
+        .gcc-chat-actions {
+            .button {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: white;
+                
+                &:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+            }
+        }
+    }
+    
+    .gcc-chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f8f9fa;
+        
+        .gcc-message {
+            margin-bottom: 15px;
+            
+            &.gcc-message-user {
+                .gcc-message-content {
+                    margin-left: auto;
+                    max-width: 70%;
+                    
+                    .gcc-message-text {
+                        background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+                        color: white;
+                        padding: 12px 16px;
+                        border-radius: 18px 18px 4px 18px;
+                        margin-bottom: 4px;
+                    }
+                    
+                    .gcc-message-time {
+                        text-align: right;
+                        font-size: 11px;
+                        color: $text-muted;
+                    }
+                }
+            }
+            
+            &.gcc-message-agent {
+                .gcc-message-content {
+                    max-width: 70%;
+                    
+                    .gcc-message-text {
+                        background: white;
+                        color: $text-color;
+                        padding: 12px 16px;
+                        border-radius: 18px 18px 18px 4px;
+                        border: 1px solid $border-color;
+                        margin-bottom: 4px;
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                    }
+                    
+                    .gcc-message-time {
+                        font-size: 11px;
+                        color: $text-muted;
+                    }
+                }
+            }
+        }
+        
+        .gcc-typing-indicator {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 18px 18px 18px 4px;
+            border: 1px solid $border-color;
+            display: flex;
+            align-items: center;
+            
+            span {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: $text-muted;
+                margin-right: 4px;
+                animation: typing 1.4s infinite;
+                
+                &:nth-child(2) {
+                    animation-delay: 0.2s;
+                }
+                
+                &:nth-child(3) {
+                    animation-delay: 0.4s;
+                    margin-right: 0;
+                }
+            }
+        }
+    }
+    
+    .gcc-chat-input {
+        border-top: 1px solid $border-color;
+        background: white;
+        border-radius: 0 0 $border-radius $border-radius;
+        
+        .gcc-input-container {
+            display: flex;
+            align-items: flex-end;
+            padding: 15px;
+            gap: 10px;
+            
+            textarea {
+                flex: 1;
+                border: 1px solid $border-color;
+                border-radius: 20px;
+                padding: 10px 15px;
+                resize: none;
+                max-height: 120px;
+                font-family: $font-family;
+                
+                &:focus {
+                    outline: none;
+                    border-color: $primary-color;
+                }
+            }
+            
+            .gcc-send-button {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+                border: none;
+                color: white;
+                cursor: pointer;
+                transition: transform 0.2s ease;
+                
+                &:hover:not(:disabled) {
+                    transform: scale(1.05);
+                }
+                
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+                
+                .dashicons {
+                    font-size: 16px;
+                }
+            }
+        }
+        
+        .gcc-quick-actions {
+            display: flex;
+            gap: 8px;
+            padding: 0 15px 15px 15px;
+            flex-wrap: wrap;
+            
+            .gcc-quick-action {
+                background: $bg-light;
+                border: 1px solid $border-color;
+                border-radius: 15px;
+                padding: 6px 12px;
+                font-size: 12px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                
+                &:hover:not(:disabled) {
+                    background: $primary-color;
+                    color: white;
+                    border-color: $primary-color;
+                }
+                
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+            }
+        }
+    }
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-10px);
+    }
+}

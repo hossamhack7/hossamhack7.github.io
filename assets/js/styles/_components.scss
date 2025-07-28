@@ -1,0 +1,246 @@
+// Component styles
+.gcc-tabs {
+    display: flex;
+    border-bottom: 2px solid $border-color;
+    margin-bottom: 20px;
+    
+    .gcc-tab {
+        background: none;
+        border: none;
+        padding: 12px 20px;
+        cursor: pointer;
+        font-size: 14px;
+        color: $text-muted;
+        border-bottom: 2px solid transparent;
+        transition: all 0.3s ease;
+        
+        &:hover {
+            color: $primary-color;
+        }
+        
+        &.active {
+            color: $primary-color;
+            border-bottom-color: $primary-color;
+            font-weight: 600;
+        }
+    }
+}
+
+.gcc-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid $border-color;
+    border-radius: $border-radius-sm;
+    background: white;
+    color: $text-color;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    
+    &:hover {
+        background: $bg-light;
+        border-color: darken($border-color, 10%);
+    }
+    
+    &.primary {
+        background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+        color: white;
+        border: none;
+        
+        &:hover {
+            background: linear-gradient(135deg, darken($primary-color, 10%) 0%, darken($secondary-color, 10%) 100%);
+        }
+    }
+    
+    &.secondary {
+        background: $bg-light;
+        border-color: $border-color;
+        
+        &:hover {
+            background: darken($bg-light, 5%);
+        }
+    }
+    
+    &.danger {
+        background: $error-color;
+        color: white;
+        border: none;
+        
+        &:hover {
+            background: darken($error-color, 10%);
+        }
+    }
+    
+    &.small {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    &.large {
+        padding: 14px 24px;
+        font-size: 16px;
+    }
+    
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        
+        &:hover {
+            background: inherit;
+            border-color: inherit;
+        }
+    }
+}
+
+.gcc-form-field {
+    margin-bottom: 20px;
+    
+    label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: $text-color;
+        font-size: 14px;
+    }
+    
+    input, select, textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid $border-color;
+        border-radius: $border-radius-sm;
+        font-size: 14px;
+        font-family: $font-family;
+        
+        &:focus {
+            outline: none;
+            border-color: $primary-color;
+            box-shadow: 0 0 0 1px rgba($primary-color, 0.2);
+        }
+    }
+    
+    .help-text {
+        margin-top: 4px;
+        font-size: 12px;
+        color: $text-muted;
+    }
+    
+    &.has-error {
+        input, select, textarea {
+            border-color: $error-color;
+        }
+        
+        .help-text {
+            color: $error-color;
+        }
+    }
+}
+
+.gcc-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    
+    .gcc-modal-content {
+        background: white;
+        border-radius: $border-radius;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        
+        .gcc-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            
+            h3 {
+                margin: 0;
+                color: $text-color;
+            }
+            
+            .gcc-modal-close {
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: $text-muted;
+                
+                &:hover {
+                    color: $text-color;
+                }
+            }
+        }
+        
+        .gcc-modal-footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    }
+}
+
+.gcc-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: $bg-light;
+    border-radius: 4px;
+    overflow: hidden;
+    
+    .gcc-progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+}
+
+.gcc-tooltip {
+    position: relative;
+    display: inline-block;
+    
+    &:hover .gcc-tooltip-content {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .gcc-tooltip-content {
+        position: absolute;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: white;
+        padding: 8px 12px;
+        border-radius: $border-radius-sm;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        z-index: 1000;
+        
+        &::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #333;
+        }
+    }
+}
