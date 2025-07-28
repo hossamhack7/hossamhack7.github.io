@@ -27,6 +27,30 @@ class Gemini_CC_API_Registrar {
 	 */
 	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+		
+		// Add debugging hook to check if routes are registered
+		add_action( 'rest_api_init', array( $this, 'debug_routes_registration' ), 20 );
+	}
+
+	/**
+	 * Debug routes registration (for troubleshooting)
+	 */
+	public function debug_routes_registration() {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$server = rest_get_server();
+			$routes = $server->get_routes();
+			
+			if ( isset( $routes['/' . self::NAMESPACE . '/status'] ) ) {
+				error_log( 'Gemini CC: Status route registered successfully' );
+			} else {
+				error_log( 'Gemini CC: Status route NOT found in registered routes' );
+				error_log( 'Gemini CC: Available routes with gemini-cc: ' . wp_json_encode( 
+					array_keys( array_filter( $routes, function( $key ) {
+						return strpos( $key, 'gemini-cc' ) !== false;
+					}, ARRAY_FILTER_USE_KEY ) )
+				) );
+			}
+		}
 	}
 
 	/**
@@ -34,7 +58,7 @@ class Gemini_CC_API_Registrar {
 	 */
 	public function register_routes() {
 		// Status endpoint
-		register_rest_route(
+		$status_route = register_rest_route(
 			self::NAMESPACE,
 			'/status',
 			array(
@@ -43,6 +67,27 @@ class Gemini_CC_API_Registrar {
 				'permission_callback' => array( $this, 'check_permissions' ),
 			)
 		);
+		
+		// Debug route (only available when WP_DEBUG is true)
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			register_rest_route(
+				self::NAMESPACE,
+				'/debug',
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_debug_info' ),
+					'permission_callback' => array( $this, 'check_permissions' ),
+				)
+			);
+		}
+
+		// Log if route registration failed
+		if ( ! $status_route ) {
+			$this->log_api_error( 'Failed to register status route', array(
+				'namespace' => self::NAMESPACE,
+				'route' => '/status',
+			) );
+		}
 
 		// Settings endpoints
 		register_rest_route(
@@ -476,21 +521,47 @@ class Gemini_CC_API_Registrar {
 	 * @return bool|WP_Error
 	 */
 	public function check_permissions( $request ) {
-		// Check nonce
-		$nonce = $request->get_header( 'X-WP-Nonce' );
-		if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+		// Log the permission check attempt for debugging
+		$this->log_api_call( 'permission_check', $request );
+		
+		// Check user capability first
+		if ( ! current_user_can( 'manage_options' ) ) {
+			$this->log_api_error( 'User capability check failed', array(
+				'user_id' => get_current_user_id(),
+				'can_manage' => current_user_can( 'manage_options' ),
+				'is_logged_in' => is_user_logged_in(),
+			) );
+			
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'Invalid nonce.', 'gemini-command-center' ),
+				__( 'You do not have permission to access this resource.', 'gemini-command-center' ),
 				array( 'status' => 403 )
 			);
 		}
 
-		// Check user capability
-		if ( ! current_user_can( 'manage_options' ) ) {
+		// Check nonce
+		$nonce = $request->get_header( 'X-WP-Nonce' );
+		if ( empty( $nonce ) ) {
+			$this->log_api_error( 'No nonce provided', array(
+				'headers' => $request->get_headers(),
+			) );
+			
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to access this resource.', 'gemini-command-center' ),
+				__( 'No security nonce provided.', 'gemini-command-center' ),
+				array( 'status' => 403 )
+			);
+		}
+		
+		if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			$this->log_api_error( 'Nonce verification failed', array(
+				'provided_nonce' => substr( $nonce, 0, 6 ) . '...',
+				'expected_action' => 'wp_rest',
+			) );
+			
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'Invalid security nonce.', 'gemini-command-center' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -507,14 +578,85 @@ class Gemini_CC_API_Registrar {
 	public function get_status( $request ) {
 		$this->log_api_call( 'status', $request );
 
-		return new WP_REST_Response(
-			array(
-				'status'  => 'ok',
-				'version' => GEMINI_CC_VERSION,
-				'time'    => current_time( 'mysql' ),
-			),
-			200
+		$status_data = array(
+			'status'          => 'ok',
+			'version'         => GEMINI_CC_VERSION,
+			'time'            => current_time( 'mysql' ),
+			'wp_version'      => get_bloginfo( 'version' ),
+			'php_version'     => PHP_VERSION,
+			'rest_url_base'   => rest_url( self::NAMESPACE . '/' ),
+			'user_id'         => get_current_user_id(),
+			'user_can_manage' => current_user_can( 'manage_options' ),
 		);
+
+		return new WP_REST_Response( $status_data, 200 );
+	}
+
+	/**
+	 * Get debug information (only available when WP_DEBUG is true)
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response
+	 */
+	public function get_debug_info( $request ) {
+		if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+			return new WP_REST_Response( 
+				array( 'error' => 'Debug mode not enabled' ), 
+				404 
+			);
+		}
+
+		$this->log_api_call( 'debug', $request );
+
+		$debug_info = array(
+			'plugin_version'     => GEMINI_CC_VERSION,
+			'wp_version'         => get_bloginfo( 'version' ),
+			'php_version'        => PHP_VERSION,
+			'rest_url_base'      => rest_url( self::NAMESPACE . '/' ),
+			'user_info'          => array(
+				'id'           => get_current_user_id(),
+				'can_manage'   => current_user_can( 'manage_options' ),
+				'is_logged_in' => is_user_logged_in(),
+			),
+			'api_log_entries'    => array_slice( get_option( 'gemini_cc_api_log', array() ), -20 ),
+			'error_log_entries'  => array_slice( get_option( 'gemini_cc_error_log', array() ), -10 ),
+			'registered_routes'  => $this->get_registered_routes(),
+			'request_headers'    => $request->get_headers(),
+			'server_info'        => array(
+				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+				'request_uri'    => $_SERVER['REQUEST_URI'] ?? 'unknown',
+				'http_host'      => $_SERVER['HTTP_HOST'] ?? 'unknown',
+			),
+		);
+
+		return new WP_REST_Response( $debug_info, 200 );
+	}
+
+	/**
+	 * Get currently registered routes for debugging
+	 *
+	 * @return array
+	 */
+	private function get_registered_routes() {
+		$server = rest_get_server();
+		$routes = $server->get_routes();
+		
+		// Filter only Gemini CC routes
+		$gemini_routes = array();
+		foreach ( $routes as $route => $handlers ) {
+			if ( strpos( $route, self::NAMESPACE ) !== false ) {
+				$gemini_routes[ $route ] = array_map( function( $handler ) {
+					return array(
+						'methods' => $handler['methods'] ?? array(),
+						'callback' => is_array( $handler['callback'] ) ? 
+							get_class( $handler['callback'][0] ) . '::' . $handler['callback'][1] :
+							$handler['callback'],
+					);
+				}, $handlers );
+			}
+		}
+		
+		return $gemini_routes;
 	}
 
 	/**
@@ -1215,10 +1357,13 @@ class Gemini_CC_API_Registrar {
 		
 		if ( ! empty( $settings['system_logging_enabled'] ) ) {
 			$log_entry = array(
+				'type'     => 'api_call',
 				'endpoint' => $endpoint,
 				'user_id'  => get_current_user_id(),
 				'ip'       => $request->get_header( 'X-Forwarded-For' ) ?: $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+				'method'   => $request->get_method(),
 				'time'     => current_time( 'mysql' ),
+				'timestamp' => time(),
 			);
 
 			$log = get_option( 'gemini_cc_api_log', array() );
@@ -1230,6 +1375,42 @@ class Gemini_CC_API_Registrar {
 			}
 
 			update_option( 'gemini_cc_api_log', $log );
+		}
+	}
+
+	/**
+	 * Log API error
+	 *
+	 * @param string $message Error message.
+	 * @param array  $context Error context.
+	 */
+	private function log_api_error( $message, $context = array() ) {
+		$settings = get_option( 'gemini_cc_settings', array() );
+		
+		// Always log errors regardless of logging setting for debugging
+		$log_entry = array(
+			'type'      => 'api_error',
+			'message'   => $message,
+			'context'   => $context,
+			'user_id'   => get_current_user_id(),
+			'time'      => current_time( 'mysql' ),
+			'timestamp' => time(),
+			'backtrace' => wp_debug_backtrace_summary(),
+		);
+
+		$error_log = get_option( 'gemini_cc_error_log', array() );
+		$error_log[] = $log_entry;
+
+		// Keep only last 500 error entries
+		if ( count( $error_log ) > 500 ) {
+			$error_log = array_slice( $error_log, -500 );
+		}
+
+		update_option( 'gemini_cc_error_log', $error_log );
+
+		// Also log to PHP error log if WP_DEBUG is enabled
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC API Error: ' . $message . ' | Context: ' . wp_json_encode( $context ) );
 		}
 	}
 }
