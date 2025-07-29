@@ -7,15 +7,28 @@
 **Solution**: This was caused by an extra closing brace in line 570 of `class-assets-loader.php`. The fix has been applied.
 
 ### ❌ "No route was found matching the URL and request method"
-**Possible Causes**:
+**Status**: ✅ FIXED  
+**Solution**: This issue was caused by API URL format incompatibility between WordPress REST API and frontend JavaScript. The fix ensures consistent `/wp-json/` URL format.
+
+**If you're still experiencing this issue**:
+1. **Verify the fix is applied**: Check that API URLs use `/wp-json/` format instead of `?rest_route=`
+2. **Test API connectivity**: Upload `debug-api.php` to your WordPress root and visit it
+3. **Manual test**: In browser console on admin page:
+   ```javascript
+   fetch('/wp-json/gemini-cc/v1/status', {
+     headers: { 'X-WP-Nonce': window.gemini_cc_data.nonce }
+   }).then(r => r.json()).then(console.log);
+   ```
+
+**Possible Causes** (if issue persists):
 - WordPress REST API disabled
-- Plugin not properly activated
+- Plugin not properly activated  
 - Nonce verification failed
 
-**Solutions**:
+**Additional Solutions**:
 1. Check if plugin is activated in WordPress admin
 2. Go to Settings → Debug Center → Export Logs for details
-3. Test API endpoint manually: `yoursite.com/wp-json/gemini-cc/v1/status`
+3. Ensure pretty permalinks are enabled in WordPress settings
 
 ### ❌ "Invalid API Key" or "Authentication Failed (401)"
 **Solutions**:
