@@ -26,6 +26,30 @@ function configureApiFetch() {
     GeminiDebugger.error('API URL is not available in gemini_cc_data', window.gemini_cc_data);
     return false;
   }
+
+  // Validate API URL format
+  const apiUrl = window.gemini_cc_data.api_url;
+  const isStandardFormat = apiUrl.includes('/wp-json/');
+  const isLegacyFormat = apiUrl.includes('rest_route=');
+  
+  GeminiDebugger.info('Gemini CC data available', {
+    api_url: apiUrl,
+    has_nonce: !!window.gemini_cc_data.nonce,
+    current_user: window.gemini_cc_data.current_user,
+    url_format: {
+      is_standard: isStandardFormat,
+      is_legacy: isLegacyFormat,
+      format_type: isStandardFormat ? 'wp-json' : (isLegacyFormat ? 'rest_route' : 'unknown')
+    }
+  });
+
+  if (!isStandardFormat && isLegacyFormat) {
+    GeminiDebugger.warn('Using legacy REST API URL format', {
+      current_url: apiUrl,
+      recommended_url: apiUrl.replace(/\/index\.php\?rest_route=/, '/wp-json'),
+      note: 'This may cause issues with @wordpress/api-fetch'
+    });
+  }
   
   GeminiDebugger.info('Gemini CC data available', {
     api_url: window.gemini_cc_data.api_url,
@@ -49,15 +73,35 @@ function configureApiFetch() {
     };
     
     return next(options).catch(error => {
-      // Enhanced error logging
+      // Enhanced error logging with URL construction details
+      const requestUrl = window.gemini_cc_data?.api_url + (options.path || '');
+      
       GeminiDebugger.error('API Request Failed', {
         path: options.path,
         method: options.method || 'GET',
+        constructed_url: requestUrl,
+        base_url: window.gemini_cc_data?.api_url,
         error: error.message,
         status: error.status || 'unknown',
         response: error.response || 'no response',
-        full_error: error
+        full_error: error,
+        // Additional context for debugging 404 errors
+        is_404: error.status === 404 || error.message?.includes('No route was found'),
+        url_format_analysis: {
+          uses_wp_json: requestUrl?.includes('/wp-json/'),
+          uses_rest_route: requestUrl?.includes('rest_route='),
+          complete_url: requestUrl
+        }
       });
+      
+      // Log specific guidance for 404 errors
+      if (error.status === 404 || error.message?.includes('No route was found')) {
+        GeminiDebugger.error('API Route Not Found - Check URL format', {
+          expected_format: 'Should use /wp-json/gemini-cc/v1/ format',
+          current_base: window.gemini_cc_data?.api_url,
+          suggestion: 'Verify that API URL uses /wp-json/ format instead of ?rest_route='
+        });
+      }
       
       // Re-throw the error so it can be handled by the calling code
       throw error;

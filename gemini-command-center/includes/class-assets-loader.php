@@ -121,11 +121,14 @@ class Gemini_CC_Assets_Loader {
 		}
 
 		// **CRITICAL: Pass nonce and API data to JavaScript**
+		// Note: Using home_url('/wp-json/...') instead of rest_url() to ensure
+		// compatibility with @wordpress/api-fetch middleware which expects
+		// standard REST API URL format (/wp-json/) rather than ?rest_route= format
 		wp_localize_script(
 			'gemini-cc-react-app',
 			'gemini_cc_data',
 			array(
-				'api_url'    => esc_url_raw( rest_url( 'gemini-cc/v1/' ) ),
+				'api_url'    => esc_url_raw( home_url( '/wp-json/gemini-cc/v1/' ) ),
 				'nonce'      => wp_create_nonce( 'wp_rest' ),
 				'admin_url'  => esc_url_raw( admin_url( 'admin.php' ) ),
 				'current_user' => array(

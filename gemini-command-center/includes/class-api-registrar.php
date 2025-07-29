@@ -40,8 +40,11 @@ class Gemini_CC_API_Registrar {
 			$server = rest_get_server();
 			$routes = $server->get_routes();
 			
-			if ( isset( $routes['/' . self::NAMESPACE . '/status'] ) ) {
+			// Check if our specific route is registered
+			$status_route_key = '/' . self::NAMESPACE . '/status';
+			if ( isset( $routes[ $status_route_key ] ) ) {
 				error_log( 'Gemini CC: Status route registered successfully' );
+				error_log( 'Gemini CC: Route details - ' . wp_json_encode( $routes[ $status_route_key ] ) );
 			} else {
 				error_log( 'Gemini CC: Status route NOT found in registered routes' );
 				error_log( 'Gemini CC: Available routes with gemini-cc: ' . wp_json_encode( 
@@ -50,6 +53,30 @@ class Gemini_CC_API_Registrar {
 					}, ARRAY_FILTER_USE_KEY ) )
 				) );
 			}
+
+			// Log all registered REST API endpoints that might be relevant
+			$all_gemini_routes = array();
+			foreach ( $routes as $route_key => $route_handlers ) {
+				if ( strpos( $route_key, 'gemini-cc' ) !== false ) {
+					$all_gemini_routes[ $route_key ] = array_map( function( $handler ) {
+						return array(
+							'methods' => $handler['methods'] ?? array(),
+							'callback' => is_array( $handler['callback'] ) && count( $handler['callback'] ) >= 2 ? 
+								get_class( $handler['callback'][0] ) . '::' . $handler['callback'][1] :
+								'unknown_callback',
+						);
+					}, $route_handlers );
+				}
+			}
+			
+			if ( ! empty( $all_gemini_routes ) ) {
+				error_log( 'Gemini CC: All registered Gemini routes - ' . wp_json_encode( $all_gemini_routes ) );
+			}
+
+			// Also log the expected URLs for testing
+			error_log( 'Gemini CC: Expected REST URLs:' );
+			error_log( 'Gemini CC: - Standard format: ' . home_url( '/wp-json/gemini-cc/v1/status' ) );
+			error_log( 'Gemini CC: - rest_url() format: ' . rest_url( 'gemini-cc/v1/status' ) );
 		}
 	}
 
@@ -607,9 +634,28 @@ class Gemini_CC_API_Registrar {
 			'wp_version'      => get_bloginfo( 'version' ),
 			'php_version'     => PHP_VERSION,
 			'rest_url_base'   => rest_url( self::NAMESPACE . '/' ),
+			'expected_url'    => home_url( '/wp-json/' . self::NAMESPACE . '/' ),
 			'user_id'         => get_current_user_id(),
 			'user_can_manage' => current_user_can( 'manage_options' ),
+			'request_info'    => array(
+				'method'     => $request->get_method(),
+				'route'      => $request->get_route(),
+				'params'     => $request->get_params(),
+				'headers'    => $request->get_headers(),
+			),
 		);
+
+		// Add debug information if WP_DEBUG is enabled
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$status_data['debug_info'] = array(
+				'server_name'    => $_SERVER['SERVER_NAME'] ?? 'unknown',
+				'request_uri'    => $_SERVER['REQUEST_URI'] ?? 'unknown',
+				'http_host'      => $_SERVER['HTTP_HOST'] ?? 'unknown',
+				'script_name'    => $_SERVER['SCRIPT_NAME'] ?? 'unknown',
+				'query_string'   => $_SERVER['QUERY_STRING'] ?? '',
+				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+			);
+		}
 
 		return new WP_REST_Response( $status_data, 200 );
 	}

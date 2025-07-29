@@ -212,7 +212,7 @@ class Gemini_Command_Center {
 		echo '<tr><th>Plugin Version</th><td>' . esc_html( GEMINI_CC_VERSION ) . '</td></tr>';
 		echo '<tr><th>WordPress Version</th><td>' . esc_html( get_bloginfo( 'version' ) ) . '</td></tr>';
 		echo '<tr><th>PHP Version</th><td>' . esc_html( PHP_VERSION ) . '</td></tr>';
-		echo '<tr><th>REST URL Base</th><td>' . esc_html( rest_url( 'gemini-cc/v1/' ) ) . '</td></tr>';
+		echo '<tr><th>REST URL Base</th><td>' . esc_html( home_url( '/wp-json/gemini-cc/v1/' ) ) . '</td></tr>';
 		echo '<tr><th>WP Debug</th><td>' . ( defined( 'WP_DEBUG' ) && WP_DEBUG ? 'Enabled' : 'Disabled' ) . '</td></tr>';
 		echo '<tr><th>Memory Limit</th><td>' . esc_html( ini_get( 'memory_limit' ) ) . '</td></tr>';
 		echo '<tr><th>Total API Calls</th><td>' . count( $api_log ) . '</td></tr>';
@@ -262,7 +262,7 @@ class Gemini_Command_Center {
 			button.textContent = "Testing...";
 			resultDiv.innerHTML = "";
 			
-			fetch("' . esc_js( rest_url( 'gemini-cc/v1/status' ) ) . '", {
+			fetch("' . esc_js( home_url( '/wp-json/gemini-cc/v1/status' ) ) . '", {
 				method: "GET",
 				headers: {
 					"X-WP-Nonce": "' . esc_js( wp_create_nonce( 'wp_rest' ) ) . '"
