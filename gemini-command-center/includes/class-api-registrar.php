@@ -26,10 +26,54 @@ class Gemini_CC_API_Registrar {
 	 * Constructor
 	 */
 	public function __construct() {
-		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+		// Register routes early with high priority
+		add_action( 'rest_api_init', array( $this, 'register_routes' ), 5 );
 		
 		// Add debugging hook to check if routes are registered
 		add_action( 'rest_api_init', array( $this, 'debug_routes_registration' ), 20 );
+		
+		// Also try to register immediately if rest_api_init has already fired
+		if ( did_action( 'rest_api_init' ) ) {
+			$this->register_routes();
+			$this->debug_routes_registration();
+		}
+		
+		// Add a verification hook to ensure routes are available
+		add_action( 'wp_loaded', array( $this, 'verify_routes_registered' ) );
+	}
+
+	/**
+	 * Verify routes are properly registered after WordPress is fully loaded
+	 */
+	public function verify_routes_registered() {
+		$server = rest_get_server();
+		$routes = $server->get_routes();
+		
+		$status_route_key = '/' . self::NAMESPACE . '/status';
+		$route_exists = isset( $routes[ $status_route_key ] );
+		
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			if ( $route_exists ) {
+				error_log( 'Gemini CC: Route verification successful - status route is registered' );
+			} else {
+				error_log( 'Gemini CC: CRITICAL - Status route not found during verification!' );
+				error_log( 'Gemini CC: Available Gemini routes: ' . wp_json_encode( 
+					array_keys( array_filter( $routes, function( $key ) {
+						return strpos( $key, 'gemini-cc' ) !== false;
+					}, ARRAY_FILTER_USE_KEY ) )
+				) );
+				
+				// Try to register routes again as a fallback
+				error_log( 'Gemini CC: Attempting fallback route registration...' );
+				$this->register_routes();
+			}
+		}
+		
+		// Store route registration status for frontend debugging
+		update_option( 'gemini_cc_routes_registered', $route_exists );
+		update_option( 'gemini_cc_route_check_time', current_time( 'mysql' ) );
+		
+		return $route_exists;
 	}
 
 	/**
@@ -43,10 +87,12 @@ class Gemini_CC_API_Registrar {
 			// Check if our specific route is registered
 			$status_route_key = '/' . self::NAMESPACE . '/status';
 			if ( isset( $routes[ $status_route_key ] ) ) {
-				error_log( 'Gemini CC: Status route registered successfully' );
+				error_log( 'Gemini CC: Status route registered successfully at ' . current_time( 'mysql' ) );
 				error_log( 'Gemini CC: Route details - ' . wp_json_encode( $routes[ $status_route_key ] ) );
 			} else {
-				error_log( 'Gemini CC: Status route NOT found in registered routes' );
+				error_log( 'Gemini CC: ERROR - Status route NOT found in registered routes at ' . current_time( 'mysql' ) );
+				error_log( 'Gemini CC: Current hook: ' . current_action() );
+				error_log( 'Gemini CC: Total registered routes: ' . count( $routes ) );
 				error_log( 'Gemini CC: Available routes with gemini-cc: ' . wp_json_encode( 
 					array_keys( array_filter( $routes, function( $key ) {
 						return strpos( $key, 'gemini-cc' ) !== false;
@@ -71,6 +117,8 @@ class Gemini_CC_API_Registrar {
 			
 			if ( ! empty( $all_gemini_routes ) ) {
 				error_log( 'Gemini CC: All registered Gemini routes - ' . wp_json_encode( $all_gemini_routes ) );
+			} else {
+				error_log( 'Gemini CC: WARNING - No Gemini routes found in registration!' );
 			}
 
 			// Also log the expected URLs for testing
@@ -84,6 +132,13 @@ class Gemini_CC_API_Registrar {
 	 * Register REST API routes
 	 */
 	public function register_routes() {
+		// Log registration attempt
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC: Starting route registration at ' . current_time( 'mysql' ) );
+			error_log( 'Gemini CC: Current hook: ' . current_action() );
+			error_log( 'Gemini CC: Namespace: ' . self::NAMESPACE );
+		}
+		
 		// Status endpoint
 		$status_route = register_rest_route(
 			self::NAMESPACE,
@@ -95,9 +150,27 @@ class Gemini_CC_API_Registrar {
 			)
 		);
 		
+		// Log if route registration failed
+		if ( ! $status_route ) {
+			$this->log_api_error( 'CRITICAL: Failed to register status route', array(
+				'namespace' => self::NAMESPACE,
+				'route' => '/status',
+				'hook' => current_action(),
+				'time' => current_time( 'mysql' )
+			) );
+			
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'Gemini CC: CRITICAL ERROR - Status route registration failed!' );
+			}
+		} else {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'Gemini CC: Status route registered successfully' );
+			}
+		}
+
 		// Debug route (only available when WP_DEBUG is true)
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			register_rest_route(
+			$debug_route = register_rest_route(
 				self::NAMESPACE,
 				'/debug',
 				array(
@@ -107,8 +180,12 @@ class Gemini_CC_API_Registrar {
 				)
 			);
 			
+			if ( ! $debug_route ) {
+				error_log( 'Gemini CC: Warning - Debug route registration failed' );
+			}
+			
 			// Frontend error logging endpoint
-			register_rest_route(
+			$log_route = register_rest_route(
 				self::NAMESPACE,
 				'/debug/log-error',
 				array(
@@ -128,18 +205,14 @@ class Gemini_CC_API_Registrar {
 					),
 				)
 			);
-		}
-
-		// Log if route registration failed
-		if ( ! $status_route ) {
-			$this->log_api_error( 'Failed to register status route', array(
-				'namespace' => self::NAMESPACE,
-				'route' => '/status',
-			) );
+			
+			if ( ! $log_route ) {
+				error_log( 'Gemini CC: Warning - Log error route registration failed' );
+			}
 		}
 
 		// Settings endpoints
-		register_rest_route(
+		$settings_route = register_rest_route(
 			self::NAMESPACE,
 			'/settings',
 			array(
@@ -157,8 +230,12 @@ class Gemini_CC_API_Registrar {
 			)
 		);
 
+		if ( ! $settings_route && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC: Warning - Settings route registration failed' );
+		}
+
 		// Test connection endpoint
-		register_rest_route(
+		$test_route = register_rest_route(
 			self::NAMESPACE,
 			'/test-connection',
 			array(
@@ -175,26 +252,20 @@ class Gemini_CC_API_Registrar {
 			)
 		);
 
-		// Backup endpoints
+		if ( ! $test_route && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC: Warning - Test connection route registration failed' );
+		}
+
+		// Register other endpoint groups
 		$this->register_backup_routes();
-
-		// SEO endpoints
 		$this->register_seo_routes();
-
-		// Content endpoints
 		$this->register_content_routes();
-
-		// System endpoints
 		$this->register_system_routes();
-
-		// UI/UX endpoints
 		$this->register_uiux_routes();
-
-		// Reports endpoints
 		$this->register_reports_routes();
 
 		// AI Agent endpoint
-		register_rest_route(
+		$agent_route = register_rest_route(
 			self::NAMESPACE,
 			'/agent/converse',
 			array(
@@ -214,6 +285,15 @@ class Gemini_CC_API_Registrar {
 				),
 			)
 		);
+
+		if ( ! $agent_route && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC: Warning - Agent route registration failed' );
+		}
+		
+		// Log completion
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'Gemini CC: Route registration completed at ' . current_time( 'mysql' ) );
+		}
 	}
 
 	/**
@@ -627,6 +707,12 @@ class Gemini_CC_API_Registrar {
 	public function get_status( $request ) {
 		$this->log_api_call( 'status', $request );
 
+		// Check if routes are properly registered
+		$server = rest_get_server();
+		$routes = $server->get_routes();
+		$status_route_key = '/' . self::NAMESPACE . '/status';
+		$route_exists = isset( $routes[ $status_route_key ] );
+
 		$status_data = array(
 			'status'          => 'ok',
 			'version'         => GEMINI_CC_VERSION,
@@ -637,6 +723,9 @@ class Gemini_CC_API_Registrar {
 			'expected_url'    => home_url( '/wp-json/' . self::NAMESPACE . '/' ),
 			'user_id'         => get_current_user_id(),
 			'user_can_manage' => current_user_can( 'manage_options' ),
+			'route_registered' => $route_exists,
+			'routes_check_time' => get_option( 'gemini_cc_route_check_time', 'Never' ),
+			'routes_registered' => get_option( 'gemini_cc_routes_registered', false ),
 			'request_info'    => array(
 				'method'     => $request->get_method(),
 				'route'      => $request->get_route(),
@@ -647,6 +736,11 @@ class Gemini_CC_API_Registrar {
 
 		// Add debug information if WP_DEBUG is enabled
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// Count Gemini routes
+			$gemini_routes = array_filter( $routes, function( $key ) {
+				return strpos( $key, 'gemini-cc' ) !== false;
+			}, ARRAY_FILTER_USE_KEY );
+			
 			$status_data['debug_info'] = array(
 				'server_name'    => $_SERVER['SERVER_NAME'] ?? 'unknown',
 				'request_uri'    => $_SERVER['REQUEST_URI'] ?? 'unknown',
@@ -654,6 +748,9 @@ class Gemini_CC_API_Registrar {
 				'script_name'    => $_SERVER['SCRIPT_NAME'] ?? 'unknown',
 				'query_string'   => $_SERVER['QUERY_STRING'] ?? '',
 				'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+				'total_routes'   => count( $routes ),
+				'gemini_routes_count' => count( $gemini_routes ),
+				'gemini_routes' => array_keys( $gemini_routes ),
 			);
 		}
 

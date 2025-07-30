@@ -403,5 +403,6 @@ function gemini_command_center_init() {
 	return Gemini_Command_Center::get_instance();
 }
 
-// Initialize plugin
-add_action( 'plugins_loaded', 'gemini_command_center_init' );
+// Initialize plugin early to ensure API routes are registered properly
+// Using 'init' instead of 'plugins_loaded' to ensure it happens before 'rest_api_init'
+add_action( 'init', 'gemini_command_center_init', 5 );
